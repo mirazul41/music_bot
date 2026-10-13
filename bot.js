@@ -1,6 +1,7 @@
 const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
-const { Player, QueryType } = require('discord-player');
+const { Player } = require('discord-player');
 const { DefaultExtractors } = require('@discord-player/extractor');
+const playdl = require('play-dl');
 const express = require('express');
 require('dotenv').config();
 
@@ -80,7 +81,7 @@ client.on('interactionCreate', async (interaction) => {
             const memberVoiceChannel = interaction.member.voice.channel;
 
             if (!memberVoiceChannel) {
-                return interaction.reply({ content: '❌ Aponi kono voice channel-e nei!', ephemeral: true });
+                return interaction.reply({ content: '❌ Aponi kono voice channel-e nei!', flags: 64 });
             }
 
             const embed = new EmbedBuilder()
@@ -123,32 +124,32 @@ client.on('interactionCreate', async (interaction) => {
 
         if (interaction.customId === 'pause_resume') {
             if (!queue || !queue.isPlaying()) {
-                return interaction.reply({ content: '❌ Kono gan cholche na!', ephemeral: true });
+                return interaction.reply({ content: '❌ Kono gan cholche na!', flags: 64 });
             }
             const paused = queue.node.toggle();
-            return interaction.reply({ content: paused ? '⏸️ Music Pause kora hoyeche.' : '▶️ Music Resume kora hoyeche.', ephemeral: true });
+            return interaction.reply({ content: paused ? '⏸️ Music Pause kora hoyeche.' : '▶️ Music Resume kora hoyeche.', flags: 64 });
         }
 
         if (interaction.customId === 'skip') {
             if (!queue || !queue.isPlaying()) {
-                return interaction.reply({ content: '❌ Skip korar jonno kono gan nei!', ephemeral: true });
+                return interaction.reply({ content: '❌ Skip korar jonno kono gan nei!', flags: 64 });
             }
             queue.node.skip();
-            return interaction.reply({ content: '⏭️ Gan-ti Skip kora hoyeche.', ephemeral: true });
+            return interaction.reply({ content: '⏭️ Gan-ti Skip kora hoyeche.', flags: 64 });
         }
 
         if (interaction.customId === 'stop') {
             if (!queue) {
-                return interaction.reply({ content: '❌ Player bondho-i ache!', ephemeral: true });
+                return interaction.reply({ content: '❌ Player bondho-i ache!', flags: 64 });
             }
             queue.delete();
-            return interaction.reply({ content: '⏹️ Music Stop kora hoyeche ebong queue clear kora hoyeche.', ephemeral: true });
+            return interaction.reply({ content: '⏹️ Music Stop kora hoyeche ebong queue clear kora hoyeche.', flags: 64 });
         }
     }
 
     if (interaction.isModalSubmit()) {
         if (interaction.customId === 'search_modal') {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ flags: 64 });
 
             const query = interaction.fields.getTextInputValue('song_query');
             const voiceChannel = interaction.member.voice.channel;
@@ -158,13 +159,20 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             try {
-               // মোডাল সাবমিটের ভেতরে এই অংশটি এভাবে আপডেট করুন:
-const searchResult = await player.search(query, {
-    requestedBy: interaction.user
-});
+                // Using play-dl to search directly to bypass cloud IP restriction
+                const searched = await playdl.search(query, { limit: 1 });
+                if (!searched || searched.length === 0) {
+                    return interaction.editReply({ content: `❌ Kono gan paowa jayni: **${query}**` });
+                }
+
+                const songUrl = searched[0].url;
+
+                const searchResult = await player.search(songUrl, {
+                    requestedBy: interaction.user
+                });
 
                 if (!searchResult || !searchResult.tracks.length) {
-                    return interaction.editReply({ content: `❌ Kono gan paowa jayni: **${query}**` });
+                    return interaction.editReply({ content: `❌ Kono gan load kora jayni: **${query}**` });
                 }
 
                 const { track } = await player.play(voiceChannel, searchResult, {
