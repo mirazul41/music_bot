@@ -1,10 +1,10 @@
 const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
-const { Player } = require('discord-player');
+const { Player, QueryType } = require('discord-player');
 const { DefaultExtractors } = require('@discord-player/extractor');
 const express = require('express');
 require('dotenv').config();
 
-// 1. Render Port Server Setup (Fixes "No open ports detected" on Render)
+// 1. Render Port Server Setup
 const app = express();
 const PORT = process.env.PORT || 3000;
 app.get('/', (req, res) => res.send('DARK X MUSIC Bot is Live 24/7!'));
@@ -28,7 +28,7 @@ const player = new Player(client, {
     }
 });
 
-// Load Extractors (Fixed for v6.6.1)
+// Load Extractors
 (async () => {
     await player.extractors.loadDefault();
 })();
@@ -158,8 +158,10 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             try {
+                // Fixed with searchEngine QueryType.YOUTUBE
                 const searchResult = await player.search(query, {
-                    requestedBy: interaction.user
+                    requestedBy: interaction.user,
+                    searchEngine: QueryType.YOUTUBE
                 });
 
                 if (!searchResult || !searchResult.tracks.length) {
@@ -169,11 +171,11 @@ client.on('interactionCreate', async (interaction) => {
                 const { track } = await player.play(voiceChannel, searchResult, {
                     nodeOptions: {
                         metadata: { channel: interaction.channel },
-                        leaveOnEnd: false,          // Gan sesh holeo channel-e thakbe
-                        leaveOnEmpty: true,         // Channel faka hole auto leave korbe
+                        leaveOnEnd: false,
+                        leaveOnEmpty: true,
                         leaveOnEmptyCooldown: 300000,
                         selfDeaf: true,
-                        repeatMode: 3               // 3 = Autoplay Mode (YouTube related songs auto play hoben)
+                        repeatMode: 3
                     }
                 });
 
