@@ -2,9 +2,9 @@
   "name": "dark-x-music",
   "version": "1.0.0",
   "description": "Discord Riffy Lavalink Music Bot",
-  "main": "index.js",
+  "main": "bot.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node bot.js"
   },
   "dependencies": {
     "@distube/ytdl-core": "^4.16.4",
