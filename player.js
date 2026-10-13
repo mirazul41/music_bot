@@ -19,62 +19,6 @@ try {
     getLangSync = () => ({ console: {} });
     getLang = async () => ({ player: {} });
 }
-const guildTrackMessages = new Map();
-const nowPlayingMessages = new Map();
-const progressUpdateIntervals = new Map();
-const guildActiveFilter = new Map();
-const guildTrackMediaCache = new Map();
-const musicCard = new EnhancedMusicCard();
-const useGeneratedSongCard = config.generateSongCard !== false;
-const enableVoiceChannelIdPatch = config.enableVoiceChannelIdPatch === true;
-const voiceDebug = config.voiceDebug === true;
-const COMMAND_MENTION_CACHE_TTL_MS = 5 * 60 * 1000;
-let commandMentionCache = {
-    expiresAt: 0,
-    map: new Map()
-};
-
-async function getCommandMentionMap(client) {
-    const now = Date.now();
-    if (commandMentionCache.expiresAt > now && commandMentionCache.map.size) {
-        return commandMentionCache.map;
-    }
-
-    const map = new Map();
-    try {
-        const fetched = await client.application.commands.fetch();
-        fetched.forEach((cmd) => {
-            if (cmd?.name && cmd?.id) map.set(cmd.name, cmd.id);
-        });
-    } catch (_) {}
-
-    commandMentionCache = {
-        expiresAt: now + COMMAND_MENTION_CACHE_TTL_MS,
-        map
-    };
-
-    return map;
-}
-
-function getCommandRef(name, mentionMap) {
-    const id = mentionMap?.get?.(name);
-    return id ? `</${name}:${id}>` : `/${name}`;
-}
-
-function buildRandomTryHint(mentionMap) {
-    const searchIcon = getEmoji('search') || '🔎';
-    const pool = ['play', 'queue', 'search', 'history', 'filters', 'trackinfo', 'stats', 'support'];
-    const picks = [];
-
-    const shuffled = [...pool].sort(() => Math.random() - 0.5);
-    for (const cmd of shuffled) {
-        if (picks.length >= 3) break;
-        picks.push(cmd);
-    }
-
-    const refs = [getCommandRef('help', mentionMap), ...picks.map((cmd) => getCommandRef(cmd, mentionMap))];
-    return `${searchIcon} Try: ${refs.join(' • ')}`;
-}
 
 function patchVoiceChannelIdSupport(player) {
     const connection = player?.connection;
@@ -106,7 +50,7 @@ async function initializePlayer(client) {
     client.nodeManager = nodeManager;
 
     client.riffy.on("playerCreate", (player) => {
-        if (enableVoiceChannelIdPatch) {
+        if (config.enableVoiceChannelIdPatch === true) {
             patchVoiceChannelIdSupport(player);
         }
     });
@@ -114,7 +58,8 @@ async function initializePlayer(client) {
     client.riffy.on("trackException", async (player, error) => {
         const langSync = getLangSync();
         const errorMsg = error?.message || 'Unknown error';
-        console.error(`${colors.cyan}[ LAVALINK ]${colors.reset} ${colors.red}${langSync.console?.player?.trackException?.replace('{guildId}', player?.guildId || 'unknown').replace('{message}', errorMsg) || `Track Exception for guild ${player?.guildId \vert{}\vert{} 'unknown'}:${errorMsg}`}${colors.reset}`);
+        const guildId = player?.guildId || 'unknown';
+        console.error(`${colors.cyan}[ LAVALINK ]${colors.reset} ${colors.red}Track Exception for guild ${guildId}: ${errorMsg}${colors.reset}`);
         
         if (player && !player.destroyed) {
             try {
@@ -126,7 +71,8 @@ async function initializePlayer(client) {
     client.riffy.on("trackStuck", (player, error) => {
         const lang = getLangSync();
         const errorMsg = error?.message || 'Unknown error';
-        console.error(`${colors.cyan}[ LAVALINK ]${colors.reset} ${colors.red}${lang.console?.player?.trackStuck?.replace('{guildId}', player?.guildId || 'unknown').replace('{message}', errorMsg) || `Track Stuck for guild ${player?.guildId \vert{}\vert{} 'unknown'}:${errorMsg}`}${colors.reset}`);
+        const guildId = player?.guildId || 'unknown';
+        console.error(`${colors.cyan}[ LAVALINK ]${colors.reset} ${colors.red}Track Stuck for guild ${guildId}: ${errorMsg}${colors.reset}`);
         
         if (player && !player.destroyed) {
             try {
