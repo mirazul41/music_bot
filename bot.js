@@ -1,7 +1,6 @@
 const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const { Player } = require('discord-player');
 const { DefaultExtractors } = require('@discord-player/extractor');
-const playdl = require('play-dl');
 const express = require('express');
 require('dotenv').config();
 
@@ -21,15 +20,16 @@ const client = new Client({
     ]
 });
 
-// 3. Initialize Discord Player
+// 3. Initialize Discord Player with stable ytdl options
 const player = new Player(client, {
     ytdlOptions: {
         filter: 'audioonly',
-        highWaterMark: 1 << 25
+        highWaterMark: 1 << 25,
+        quality: 'highestaudio'
     }
 });
 
-// Load Extractors
+// Load Default Extractors
 (async () => {
     await player.extractors.loadDefault();
 })();
@@ -159,20 +159,13 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             try {
-                // Using play-dl to search directly to bypass cloud IP restriction
-                const searched = await playdl.search(query, { limit: 1 });
-                if (!searched || searched.length === 0) {
-                    return interaction.editReply({ content: `❌ Kono gan paowa jayni: **${query}**` });
-                }
-
-                const songUrl = searched[0].url;
-
-                const searchResult = await player.search(songUrl, {
+                // Direct clean search without complex wrappers
+                const searchResult = await player.search(query, {
                     requestedBy: interaction.user
                 });
 
                 if (!searchResult || !searchResult.tracks.length) {
-                    return interaction.editReply({ content: `❌ Kono gan load kora jayni: **${query}**` });
+                    return interaction.editReply({ content: `❌ Kono gan paowa jayni: **${query}**` });
                 }
 
                 const { track } = await player.play(voiceChannel, searchResult, {
