@@ -1,6 +1,5 @@
 const { Riffy } = require("riffy");
 const config = require("./config.js");
-const colors = require('./UI/colors/colors');
 const { autoplayCollection } = require('./mongodb.js');
 const { initializeLavalinkManager } = require('./lavalink.js');
 
@@ -19,10 +18,9 @@ async function initializePlayer(client) {
     client.nodeManager = nodeManager;
 
     client.riffy.on("trackException", async (player, error) => {
-        const langSync = getLangSync();
-        const errorMsg = error?.message || 'Unknown error';
         const guildId = player?.guildId || 'unknown';
-        console.error(`${colors.cyan}[ LAVALINK ]${colors.reset} ${colors.red}Track Exception for guild ${guildId}: ${errorMsg}${colors.reset}`);
+        const errorMsg = error?.message || 'Unknown error';
+        console.error(`[ LAVALINK ] Track Exception for guild ${guildId}: ${errorMsg}`);
         
         if (player && !player.destroyed) {
             try {
@@ -34,7 +32,7 @@ async function initializePlayer(client) {
     client.riffy.on("trackStuck", (player, error) => {
         const guildId = player?.guildId || 'unknown';
         const errorMsg = error?.message || 'Unknown error';
-        console.error(`${colors.cyan}[ LAVALINK ]${colors.reset} ${colors.red}Track Stuck for guild ${guildId}: ${errorMsg}${colors.reset}`);
+        console.error(`[ LAVALINK ] Track Stuck for guild ${guildId}: ${errorMsg}`);
         
         if (player && !player.destroyed) {
             try {
