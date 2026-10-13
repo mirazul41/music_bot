@@ -1,6 +1,5 @@
 const { Riffy } = require("riffy");
 const config = require("./config.js");
-const { autoplayCollection } = require('./mongodb.js');
 const { initializeLavalinkManager } = require('./lavalink.js');
 
 let getLangSync;
@@ -49,12 +48,11 @@ async function initializePlayer(client) {
     client.riffy.on("queueEnd", async (player) => {
         const guildId = player.guildId;
         try {
-            const settings = await autoplayCollection.findOne({ guildId });
-            if (!settings?.twentyfourseven) {
+            if (player && !player.destroyed) {
                 player.destroy();
             }
         } catch (error) {
-            if (!player.destroyed) player.destroy();
+            if (player && !player.destroyed) player.destroy();
         }
     });
 }
