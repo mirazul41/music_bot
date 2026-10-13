@@ -46,9 +46,7 @@ async function getCommandMentionMap(client) {
         fetched.forEach((cmd) => {
             if (cmd?.name && cmd?.id) map.set(cmd.name, cmd.id);
         });
-    } catch (_) {
-        // Fallback to plain /command text when mentions cannot be fetched.
-    }
+    } catch (_) {}
 
     commandMentionCache = {
         expiresAt: now + COMMAND_MENTION_CACHE_TTL_MS,
@@ -78,73 +76,6 @@ function buildRandomTryHint(mentionMap) {
     return `${searchIcon} Try: ${refs.join(' • ')}`;
 }
 
-const PLAYER_FAVORITES_NAME = 'AutoFavourites';
-const LEGACY_PLAYER_FAVORITES_NAME = '__FAVORITES__';
-const PLAYER_FILTER_OPTIONS = [
-    { label: 'Karaoke', value: 'karaoke' },
-    { label: 'Timescale', value: 'timescale' },
-    { label: 'Tremolo', value: 'tremolo' },
-    { label: 'Vibrato', value: 'vibrato' },
-    { label: '3D', value: 'rotation' },
-    { label: 'Distortion', value: 'distortion' },
-    { label: 'Channel Mix', value: 'channelmix' },
-    { label: 'Low Pass', value: 'lowpass' },
-    { label: 'Bassboost', value: 'bassboost' },
-    { label: 'Nightcore', value: 'nightcore' },
-    { label: 'Daycore', value: 'daycore' }
-];
-
-function createAddSongModal() {
-    const modal = new ModalBuilder()
-        .setCustomId('player_modal_addsong')
-        .setTitle('Add Song to Queue');
-
-    const input = new TextInputBuilder()
-        .setCustomId('query')
-        .setLabel('Song Name or URL')
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder('e.g. Adele Skyfall or https://...')
-        .setRequired(true)
-        .setMaxLength(200);
-
-    modal.addComponents(new ActionRowBuilder().addComponents(input));
-    return modal;
-}
-
-function createVolumeModal(currentVolume = 100) {
-    const modal = new ModalBuilder()
-        .setCustomId('player_modal_volume')
-        .setTitle('Set Volume');
-
-    const input = new TextInputBuilder()
-        .setCustomId('volume')
-        .setLabel('Volume (1-100)')
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder(String(Math.min(100, Math.max(1, currentVolume || 100))))
-        .setRequired(true)
-        .setMaxLength(3);
-
-    modal.addComponents(new ActionRowBuilder().addComponents(input));
-    return modal;
-}
-
-function createSaveSongModal() {
-    const modal = new ModalBuilder()
-        .setCustomId('player_modal_save_song')
-        .setTitle('Save Song to Playlist');
-
-    const input = new TextInputBuilder()
-        .setCustomId('playlistName')
-        .setLabel('Playlist Name')
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder('My Favorites')
-        .setRequired(true)
-        .setMaxLength(80);
-
-    modal.addComponents(new ActionRowBuilder().addComponents(input));
-    return modal;
-}
-
 function patchVoiceChannelIdSupport(player) {
     const connection = player?.connection;
     if (!connection || connection.__voiceChannelIdPatchApplied) return;
@@ -164,233 +95,8 @@ function patchVoiceChannelIdSupport(player) {
             if (channelId) {
                 connection.voice.channelId = channelId;
             }
-            if (voiceDebug) {
-                console.log(`[ VOICE DEBUG ] stateUpdate guild=${player.guildId} channelId=${channelId || 'null'} sessionId=${data?.session_id ? 'yes' : 'no'}`);
-            }
         };
     }
-
-    if (typeof connection.updatePlayerVoiceData === "function") {
-        const originalUpdatePlayerVoiceData = connection.updatePlayerVoiceData.bind(connection);
-        connection.updatePlayerVoiceData = () => {
-            if (!connection.voice.channelId) {
-                connection.voice.channelId = connection.voiceChannel || player.voiceChannel || null;
-            }
-            if (voiceDebug) {
-                const v = connection.voice || {};
-                console.log(`[ VOICE DEBUG ] updatePlayerVoiceData guild=${player.guildId} channelId=${v.channelId || 'null'} sessionId=${v.sessionId ? 'yes' : 'no'} token=${v.token ? 'yes' : 'no'} endpoint=${v.endpoint ? 'yes' : 'no'}`);
-            }
-            originalUpdatePlayerVoiceData();
-        };
-    }
-}
-
-function stripMediaGallery(components = []) {
-    return components.filter((component) => !(component instanceof MediaGalleryBuilder));
-}
-
-function formatSourceName(sourceName) {
-    const raw = String(sourceName || 'Unknown').toLowerCase();
-    if (raw === 'youtube') return 'YouTube';
-    if (raw === 'soundcloud') return 'SoundCloud';
-    if (raw === 'spotify') return 'Spotify';
-    if (raw === 'applemusic') return 'Apple Music';
-    return raw.charAt(0).toUpperCase() + raw.slice(1);
-}
-
-function setTrackMediaCache(guildId, trackUri, mediaUrl = null, cardBuffer = null) {
-    if (!guildId || !trackUri) return;
-    guildTrackMediaCache.set(guildId, { trackUri, mediaUrl, cardBuffer });
-}
-
-function getTrackMediaCache(guildId, trackUri) {
-    const cached = guildTrackMediaCache.get(guildId);
-    if (!cached || cached.trackUri !== trackUri) return null;
-    return cached;
-}
-
-function clearTrackMediaCache(guildId) {
-    guildTrackMediaCache.delete(guildId);
-}
-
-function clearProgressUpdates(guildId) {
-    const intervalId = progressUpdateIntervals.get(guildId);
-    if (intervalId) {
-        clearInterval(intervalId);
-        progressUpdateIntervals.delete(guildId);
-    }
-}
-
-function buildNowPlayingContainer(track, requesterName, t, progressBar, progressPercent, mediaUrl, actionRows = {}, playerState = {}) {
-    const titleIcon = getEmoji('music') || '🎧';
-    const infoIcon = getEmoji('info') || 'ℹ️';
-    const timeIcon = getEmoji('uptime') || '⏱️';
-    const queueIcon = getEmoji('queue') || '📄';
-    const userIcon = getEmoji('users') || '👤';
-    const sourceIcon = getEmoji('servers') || '🌐';
-    const playIcon = getEmoji('play') || '▶️';
-    const pauseIcon = getEmoji('pause') || '⏸️';
-    const loopIcon = getEmoji('settings') || '🔁';
-    const controlsIcon = getEmoji('settings') || '⚙️';
-    const manageIcon = getEmoji('owner') || '👑';
-    const filterIcon = getEmoji('servers') || '🌐';
-    const byText = t.trackInfo?.by || 'by';
-    const isPaused = playerState.paused === true;
-    const loopMode = playerState.loop || 'none';
-    const isLoopOn = loopMode !== 'none';
-    const sourceName = formatSourceName(track.info?.sourceName);
-    const stateLabel = isPaused ? (t.playerState?.paused || 'Paused') : (t.playerState?.playing || 'Playing');
-    const loopStateLabel = isLoopOn ? (t.playerState?.loopOn || 'Loop On') : (t.playerState?.loopOff || 'Loop Off');
-    const stateLine1 = `${isPaused ? pauseIcon : playIcon} ${stateLabel}`;
-    const stateLine2 = `${loopIcon} ${loopStateLabel}`;
-    const durationLine = `${timeIcon} ${formatDuration(track.info.length)}`;
-    const requesterLine = `${userIcon} ${requesterName || (t.trackInfo?.unknown || 'Unknown')}`;
-    const sourceLine = `${sourceIcon} ${sourceName}`;
-    const queueHint = `${queueIcon} ${playerState.queueLength || 0} ${playerState.queueLength === 1 ? 'song' : 'songs'} in queue`;
-    const tryHint = buildRandomTryHint(playerState.commandMentionMap);
-    const showTitleBlock = !mediaUrl;
-
-    const container = new ContainerBuilder();
-
-    if (mediaUrl) {
-        const mediaGallery = new MediaGalleryBuilder().addItems(
-            (mediaItem) => mediaItem
-                .setURL(mediaUrl)
-                .setDescription(`${track.info?.title || 'Unknown Title'} - ${track.info?.author || 'Unknown Artist'}`)
-        );
-
-        container
-            .addSeparatorComponents((separator) => separator)
-            .addMediaGalleryComponents(mediaGallery);
-    }
-
-    if (showTitleBlock) {
-        container.addTextDisplayComponents(
-            (textDisplay) => textDisplay.setContent(
-                `### ${titleIcon} ${track.info.title || 'Unknown Title'}\n` +
-                `${byText} ${track.info.author || (t.trackInfo?.unknownArtist || 'Unknown Artist')}`
-            )
-        );
-    }
-
-    const showSongDetails = !mediaUrl || config.metadataTag === true;
-    if (showSongDetails) {
-        container
-            .addSeparatorComponents((separator) => separator)
-            .addTextDisplayComponents(
-                (textDisplay) => textDisplay.setContent(
-                    `### ${infoIcon} ${t.songDetailsTitle || 'Song Details'}\n` +
-                    `${stateLine1}\n` +
-                    `${stateLine2}\n` +
-                    `${durationLine}\n` +
-                    `${requesterLine}\n` +
-                    `${sourceLine}\n` +
-                    `${queueHint}`
-                )
-            );
-    }
-
-    if (actionRows?.playbackRow) {
-        container
-            .addSeparatorComponents((separator) => separator)
-            .addTextDisplayComponents((textDisplay) => textDisplay.setContent(`### ${controlsIcon} Playback`))
-            .addActionRowComponents(actionRows.playbackRow);
-    }
-
-    if (actionRows?.manageRow) {
-        container
-            .addSeparatorComponents((separator) => separator)
-            .addTextDisplayComponents((textDisplay) => textDisplay.setContent(`### ${manageIcon} Library`))
-            .addActionRowComponents(actionRows.manageRow);
-    }
-
-    if (actionRows?.filterRow) {
-        container
-            .addSeparatorComponents((separator) => separator)
-            .addTextDisplayComponents((textDisplay) => textDisplay.setContent(`### ${filterIcon} Effects`))
-            .addActionRowComponents(actionRows.filterRow);
-    }
-
-    container
-        .addSeparatorComponents((separator) => separator)
-        .addTextDisplayComponents((textDisplay) => textDisplay.setContent(tryHint));
-
-    return container;
-}
-
-async function sendMessageWithPermissionsCheck(channel, components, attachment) {
-    try {
-        const permissions = channel.permissionsFor(channel.guild.members.me);
-        const needsAttachPermission = !!attachment;
-        if (!permissions.has(PermissionsBitField.Flags.SendMessages) ||
-            !permissions.has(PermissionsBitField.Flags.EmbedLinks)) {
-            const lang = getLangSync();
-            console.error(lang.console?.player?.lacksPermissions || "Bot lacks necessary permissions to send messages in this channel.");
-            return;
-        }
-
-        let safeComponents = components;
-        let safeAttachment = attachment;
-        if (needsAttachPermission && !permissions.has(PermissionsBitField.Flags.AttachFiles)) {
-            safeComponents = stripMediaGallery(components);
-            safeAttachment = null;
-        }
-
-        const messageOptions = {
-            components: safeComponents,
-            flags: MessageFlags.IsComponentsV2
-        };
-        
-        if (safeAttachment) {
-            messageOptions.files = [safeAttachment];
-        }
-        
-        try {
-            const message = await channel.send(messageOptions);
-            return message;
-        } catch (sendError) {
-            const fallbackComponents = stripMediaGallery(components);
-            const fallbackOptions = {
-                components: fallbackComponents,
-                flags: MessageFlags.IsComponentsV2
-            };
-            try {
-                const message = await channel.send(fallbackOptions);
-                return message;
-            } catch (_) {
-                const minimalOptions = {
-                    components: fallbackComponents,
-                    flags: MessageFlags.IsComponentsV2
-                };
-                const message = await channel.send(minimalOptions);
-                return message;
-            }
-        }
-    } catch (error) {
-        const langSync = getLangSync();
-        console.error(langSync.console?.player?.errorSendingMessage?.replace('{message}', error.message) || "Error sending message:", error.message);
-        const lang = await getLang(channel.guildId).catch(() => ({ console: { player: {} } }));
-        const t = lang.console?.player || {};
-        const errorContainer = cardFromMessage(
-            `${t.unableToSendMessage?.title || '## ⚠️ Unable to Send Message'}\n\n` +
-            `${t.unableToSendMessage?.message || 'Unable to send message. Check bot permissions.'}`,
-            'Unable to Send Message'
-        );
-        await channel.send({ 
-            components: [errorContainer],
-            flags: MessageFlags.IsComponentsV2
-        }).catch(() => {});
-    }
-}
-
-async function sendTransientCard(channel, message, deleteMs = 5000, fallbackTitle = 'Notice') {
-    const container = cardFromMessage(message, fallbackTitle);
-    const sent = await channel.send({
-        components: [container],
-        flags: MessageFlags.IsComponentsV2
-    });
-    setTimeout(() => sent.delete().catch(() => {}), deleteMs);
-    return sent;
 }
 
 async function initializePlayer(client) {
@@ -403,25 +109,48 @@ async function initializePlayer(client) {
         if (enableVoiceChannelIdPatch) {
             patchVoiceChannelIdSupport(player);
         }
-        if (voiceDebug) {
-            console.log(`[ VOICE DEBUG ] playerCreate guild=${player.guildId} voiceChannel=${player.voiceChannel || 'null'} patch=${enableVoiceChannelIdPatch ? 'on' : 'off'}`);
-        }
     });
 
     client.riffy.on("trackException", async (player, error) => {
         const langSync = getLangSync();
         const errorMsg = error?.message || 'Unknown error';
-        const isTimeout = errorMsg.includes('timeout') || errorMsg.includes('Read timed out') || errorMsg.includes('SocketTimeoutException');
+        console.error(`${colors.cyan}[ LAVALINK ]${colors.reset} ${colors.red}${langSync.console?.player?.trackException?.replace('{guildId}', player?.guildId || 'unknown').replace('{message}', errorMsg) || `Track Exception for guild ${player?.guildId \vert{}\vert{} 'unknown'}:${errorMsg}`}${colors.reset}`);
         
-        if (isTimeout) {
-            console.warn(`${colors.cyan}[ LAVALINK ]${colors.reset} ${colors.yellow}Track timeout for guild ${player?.guildId || 'unknown'}: ${errorMsg}${colors.reset}`);
-        } else {
-            console.error(`${colors.cyan}[ LAVALINK ]${colors.reset} ${colors.red}${langSync.console?.player?.trackException?.replace('{guildId}', player?.guildId || 'unknown').replace('{message}', errorMsg) || `Track Exception for guild ${player?.guildId \vert{}\vert{} 'unknown'}:${errorMsg}`}${colors.reset}`);
+        if (player && !player.destroyed) {
+            try {
+                player.stop();
+            } catch (stopError) {}
         }
+    });
+
+    client.riffy.on("trackStuck", (player, error) => {
+        const lang = getLangSync();
+        const errorMsg = error?.message || 'Unknown error';
+        console.error(`${colors.cyan}[ LAVALINK ]${colors.reset} ${colors.red}${lang.console?.player?.trackStuck?.replace('{guildId}', player?.guildId || 'unknown').replace('{message}', errorMsg) || `Track Stuck for guild ${player?.guildId \vert{}\vert{} 'unknown'}:${errorMsg}`}${colors.reset}`);
         
-        const channel = client.channels.cache.get(player?.textChannel);
-        if (channel) {
-            const lang = await getLang(player.guildId).catch(() => ({ console: { player: {} } }));
-            const t = lang.console?.player || {};
-            
-            let errorMessage = t.trackError?.message || 'Failed to load the
+        if (player && !player.destroyed) {
+            try {
+                player.stop();
+            } catch (stopError) {}
+        }
+    });
+
+    client.riffy.on("trackStart", async (player, track) => {
+        if (!track || !track.info) return;
+        await new Promise(resolve => setTimeout(resolve, 200));
+    });
+
+    client.riffy.on("queueEnd", async (player) => {
+        const guildId = player.guildId;
+        try {
+            const settings = await autoplayCollection.findOne({ guildId });
+            if (!settings?.twentyfourseven) {
+                player.destroy();
+            }
+        } catch (error) {
+            if (!player.destroyed) player.destroy();
+        }
+    });
+}
+
+module.exports = { initializePlayer };
