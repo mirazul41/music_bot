@@ -1,216 +1,204 @@
+const { Client, GatewayIntentBits } = require("discord.js");
+const config = require("./config.js");
+const fs = require("fs");
+const path = require('path');
+const { initializePlayer } = require('./player');
+const { connectToDatabase } = require('./mongodb');
+const colors = require('./UI/colors/colors');
+const { getLavalinkManager } = require('./lavalink.js');
+const { getLang, getLangSync } = require('./utils/languageLoader.js');
 require('dotenv').config();
-const { 
-    Client, 
-    GatewayIntentBits, 
-    ActionRowBuilder, 
-    ButtonBuilder, 
-    ButtonStyle, 
-    EmbedBuilder,
-    ModalBuilder,
-    TextInputBuilder,
-    TextInputStyle,
-    REST,
-    Routes,
-    SlashCommandBuilder
-} = require('discord.js');
-const { Player } = require('discord-player');
 
-// Discord Client Setup
 const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildVoiceStates,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
-    ]
+    intents: Object.keys(GatewayIntentBits).map((a) => {
+        return GatewayIntentBits[a];
+    }),
 });
 
-// Music Player Setup
-const player = new Player(client);
+client.config = config;
 
-// Extractor Load & Register Slash Command (Fixed loadDefault)
-client.once('clientReady', async () => {
-    try {
-        await player.extractors.loadDefault();
-        console.log(`✅ Bot successfully logged in as: ${client.user.tag}`);
-
-        // Slash command /join register kora
-        const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
-        const commands = [
-            new SlashCommandBuilder()
-                .setName('join')
-                .setDescription('join your voice channel')
-        ];
-
-        // গ্লোবালি স্ল্যাশ কমান্ড রেজিস্টার করা
-        await rest.put(
-            Routes.applicationCommands(client.user.id),
-            { body: commands }
-        );
-        console.log('✅ Slash command /join globally registered successfully!');
-    } catch (error) {
-        console.error('❌ Setup error:', error);
+process.on('unhandledRejection', (error) => {
+    const lang = getLangSync();
+    if (error && error.message && (
+        error.message.includes('Cannot read properties of null') ||
+        error.message.includes('track.info') ||
+        error.message.includes('thumbnail') ||
+        error.message.includes('player.restart is not a function') ||
+        error.message.includes('restart is not a function')
+    )) {
+        if (error.message.includes('player.restart') || error.message.includes('restart is not a function')) {
+            console.warn(`${colors.cyan}[ LAVALINK ]${colors.reset} ${colors.yellow}Ignoring Riffy reconnect bug: ${error.message}${colors.reset}`);
+        }
+        return;
     }
+    
+    if (error && (error.cause || error.message)) {
+        const cause = error.cause || {};
+        const errorMsg = error.message || '';
+        
+        if (cause.code === 'UND_ERR_CONNECT_TIMEOUT' || 
+            errorMsg.includes('Connect Timeout') || 
+            errorMsg.includes('fetch failed') ||
+            errorMsg.includes('ConnectTimeoutError')) {
+            console.warn(`${colors.cyan}[ LAVALINK ]${colors.reset} ${colors.yellow}Connection timeout to Lavalink node - will retry automatically${colors.reset}`);
+            return; 
+        }
+    }
+    
+    console.error(lang.console?.bot?.unhandledRejection || 'Unhandled Rejection:', error);
 });
 
-const autoplayMap = new Map();
-
-// Control Panel Buttons
-function getControlButtons(guildId) {
-    const isAutoplay = autoplayMap.get(guildId) || false;
-
-    const row1 = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId('btn_open_search')
-            .setLabel('🔎 Search & Play Song')
-            .setStyle(ButtonStyle.Success),
-        new ButtonBuilder()
-            .setCustomId('btn_pause_resume')
-            .setLabel('⏯️ Pause / Resume')
-            .setStyle(ButtonStyle.Primary),
-        new ButtonBuilder()
-            .setCustomId('btn_skip')
-            .setLabel('⏭️ Skip')
-            .setStyle(ButtonStyle.Secondary)
-    );
-
-    const row2 = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-            .setCustomId('btn_stop')
-            .setLabel('⏹️ Stop & Leave')
-            .setStyle(ButtonStyle.Danger),
-        new ButtonBuilder()
-            .setCustomId('btn_autoplay')
-            .setLabel(isAutoplay ? '🔁 Autoplay: ON' : '🔁 Autoplay: OFF')
-            .setStyle(isAutoplay ? ButtonStyle.Success : ButtonStyle.Secondary)
-    );
-
-    return [row1, row2];
-}
-
-// Interaction Handlers (Slash Command, Modal & Buttons)
-client.on('interactionCreate', async (interaction) => {
-
-    // A. Slash Command (/join) - বটের নামসহ শো করবে
-    if (interaction.isChatInputCommand() && interaction.commandName === 'join') {
-        const voiceChannel = interaction.member?.voice?.channel;
-        if (!voiceChannel) {
-            return interaction.reply({ content: '❌ আপনাকে প্রথমে একটি Voice Channel-এ জয়েন করতে হবে!', ephemeral: true });
-        }
-
-        const embed = new EmbedBuilder()
-            .setColor('#00ffcc')
-            .setTitle(`🎶 ${client.user.username.toUpperCase()} - MUSIC PANEL`)
-            .setDescription(`বট ভয়েস চ্যানেল **${voiceChannel.name}**-এ জয়েন করেছে!\nগান বাজাতে নিচের **🔎 Search & Play Song** বাটনে ক্লিক করুন।`)
-            .setFooter({ text: 'এই প্যানেল থেকেই সমস্ত গান নিয়ন্ত্রণ করতে পারবেন।' });
-
-        return interaction.reply({
-            embeds: [embed],
-            components: getControlButtons(interaction.guild.id)
-        });
+process.on('uncaughtException', (error) => {
+    const lang = getLangSync();
+    if (error && error.message && (
+        error.message.includes('Cannot read properties of null') ||
+        error.message.includes('track.info') ||
+        error.message.includes('thumbnail')
+    )) {
+        console.warn(lang.console?.bot?.riffyThumbnailError?.replace('{message}', error.message) || `[ Riffy ] Ignoring thumbnail error: ${error.message}`);
+        return;
     }
+    console.error(lang.console?.bot?.uncaughtException || 'Uncaught Exception:', error);
+});
 
-    // B. "Search & Play Song" Button Click -> Popup Modal (পপ-আপ বক্স)
-    if (interaction.isButton() && interaction.customId === 'btn_open_search') {
-        const modal = new ModalBuilder()
-            .setCustomId('modal_song_search')
-            .setTitle('🎵 Search & Play Music Box');
+initializePlayer(client).catch(error => {
+    const lang = getLangSync();
+    console.error(`${colors.cyan}[ LAVALINK ]${colors.reset} ${colors.red}${lang.console?.bot?.lavalinkError?.replace('{message}', error.message) || `Error initializing player: ${error.message}`}${colors.reset}`);
+});
 
-        const songInput = new TextInputBuilder()
-            .setCustomId('input_song_name')
-            .setLabel('গানের নাম বা ইউটিউব লিংক দিন:')
-            .setStyle(TextInputStyle.Short)
-            .setPlaceholder('যেমন: Shape of you')
-            .setRequired(true);
-
-        const row = new ActionRowBuilder().addComponents(songInput);
-        modal.addComponents(row);
-
-        return interaction.showModal(modal);
-    }
-
-    // C. Modal Form Submit -> Play Music & Show Details
-    if (interaction.isModalSubmit() && interaction.customId === 'modal_song_search') {
-        const query = interaction.fields.getTextInputValue('input_song_name');
-        const voiceChannel = interaction.member?.voice?.channel;
-
-        if (!voiceChannel) {
-            return interaction.reply({ content: '❌ আপনাকে ভয়েস চ্যানেলে থাকতে হবে!', ephemeral: true });
-        }
-
-        await interaction.deferReply();
-
-        try {
-            const queue = player.nodes.get(interaction.guild.id);
-            if (queue && queue.isPlaying()) {
-                queue.delete();
-            }
-
-            const result = await player.play(voiceChannel, query, {
-                nodeOptions: {
-                    metadata: interaction.channel,
-                    leaveOnEmpty: true,
-                    leaveOnEmptyCooldown: 300000
+client.on("clientReady", () => {
+    const lang = getLangSync();
+    console.log(`${colors.cyan}[ SYSTEM ]${colors.reset} ${colors.green}${lang.console?.bot?.clientLogged?.replace('{tag}', client.user.tag) || `Client logged as ${client.user.tag}`}${colors.reset}`);
+    console.log(`${colors.cyan}[ MUSIC ]${colors.reset} ${colors.green}${lang.console?.bot?.musicSystemReady || 'Riffy Music System Ready 🎵'}${colors.reset}`);
+   
+    const nodeManager = getLavalinkManager();
+    if (nodeManager) {
+        nodeManager.init(client.user.id);
+        
+        setTimeout(() => {
+            const status = nodeManager.getNodeStatus();
+            const availableCount = nodeManager.getNodeCount();
+            const totalCount = nodeManager.getTotalNodeCount();
+            
+            console.log(`${colors.cyan}[ LAVALINK ]${colors.reset} ${colors.green}${lang.console?.bot?.nodeManagerStatus?.replace('{available}', availableCount).replace('{total}', totalCount) || `Node Manager: ${availableCount}/${totalCount} nodes available`}${colors.reset}`);
+            
+            if (status.nodes.length > 0) {
+                console.log(`${colors.cyan}[ LAVALINK ]${colors.reset} ${lang.console?.bot?.nodeStatus || 'Node Status:'}`);
+                for (const node of status.nodes) {
+                    const statusIcon = node.online ? `${colors.green}✅${colors.reset}` : `${colors.red}❌${colors.reset}`;
+                    const statusText = node.online ? 'ONLINE' : 'OFFLINE';
+                    const errorText = node.lastError ? ` | ${colors.yellow}${node.lastError}${colors.reset}` : '';
+                    const nodeInfo = lang.console?.bot?.nodeInfo?.replace('{icon}', statusIcon).replace('{name}', node.name).replace('{host}', node.host).replace('{port}', node.port).replace('{status}', statusText).replace('{error}', errorText) || `  ${statusIcon} ${colors.yellow}${node.name}${colors.reset} (${node.host}:${node.port}) - ${statusText}${errorText}`;
+                    console.log(nodeInfo);
                 }
-            });
+            }
+        }, 3000);
+    } else if (client.riffy) {
+        client.riffy.init(client.user.id);
+    }
+});
 
-            const embed = new EmbedBuilder()
-                .setColor('#00ffcc')
-                .setTitle(`🎶 ${client.user.username.toUpperCase()} - CURRENTLY PLAYING`)
-                .setDescription(`**Song Name:** [${result.track.title}](${result.track.url})\n**Voice Channel:** ${voiceChannel.name}`)
-                .addFields(
-                    { name: '⏱️ Duration', value: result.track.duration, inline: true },
-                    { name: '👤 Requested By', value: `<@${interaction.user.id}>`, inline: true }
-                )
-                .setThumbnail(result.track.thumbnail)
-                .setFooter({ text: 'Control options below: Search, Pause, Skip, Stop, Autoplay' });
+fs.readdir("./events", (_err, files) => {
+  if (_err) return;
+  files.forEach((file) => {
+    if (!file.endsWith(".js")) return;
+    const event = require(`./events/${file}`);
+    let eventName = file.split(".")[0]; 
+    client.on(eventName, event.bind(null, client));
+    delete require.cache[require.resolve(`./events/${file}`)];
+  });
+});
 
-            return interaction.editReply({
-                embeds: [embed],
-                components: getControlButtons(interaction.guild.id)
-            });
+client.commands = new Map();
+client.commandsArray = [];
 
+const loadCommands = () => {
+  const loadCommandsFromDir = (dir, category = '') => {
+    if (!fs.existsSync(dir)) return;
+    const items = fs.readdirSync(dir, { withFileTypes: true });
+    
+    for (const item of items) {
+      const fullPath = path.join(dir, item.name);
+      
+      if (item.isDirectory()) {
+        loadCommandsFromDir(fullPath, item.name);
+      } else if (item.isFile() && item.name.endsWith('.js')) {
+        try {
+          const absolutePath = path.resolve(fullPath);
+          const command = require(absolutePath);
+          
+          if (command.data && command.run) {
+            client.commands.set(command.data.name, command);
+            client.commandsArray.push(command.data.toJSON());
+          } else {
+            const lang = getLangSync();
+            console.log(`${colors.cyan}[ COMMANDS ]${colors.reset} ${colors.red}${lang.console?.bot?.commandLoadFailed?.replace('{name}', item.name) || `Failed to load: ${item.name} - Missing data or run property`}${colors.reset}`);
+          }
         } catch (error) {
-            console.error('Play error:', error);
-            return interaction.editReply({ content: '❌ গানটি চালানো সম্ভব হয়নি!' });
+          const lang = getLangSync();
+          console.error(`${colors.cyan}[ COMMANDS ]${colors.reset} ${colors.red}${lang.console?.bot?.commandLoadError?.replace('{name}', item.name).replace('{message}', error.message) || `Error loading ${item.name}:${error.message}`}${colors.reset}`);
         }
+      }
     }
+  };
+  
+  const commandsDir = path.resolve(__dirname, config.commandsDir);
+  loadCommandsFromDir(commandsDir);
+  const lang = getLangSync();
+  console.log(`${colors.cyan}[ COMMANDS ]${colors.reset} ${colors.green}${lang.console?.bot?.commandsLoaded?.replace('{count}', client.commands.size) || `Total Commands Loaded: ${client.commands.size}`}${colors.reset}`);
+};
 
-    // D. Control Buttons Handler (Pause, Skip, Stop, Autoplay)
-    if (interaction.isButton()) {
-        const queue = player.nodes.get(interaction.guild.id);
+loadCommands();
 
-        if (interaction.customId !== 'btn_open_search' && (!queue || !queue.isPlaying())) {
-            return interaction.reply({ content: '❌ বর্তমানে কোনো গান চলছে না!', ephemeral: true });
-        }
-
-        try {
-            if (interaction.customId === 'btn_pause_resume') {
-                if (queue.node.isPaused()) {
-                    queue.node.resume();
-                    await interaction.reply({ content: '▶️ গান আবার প্লে করা হয়েছে!', ephemeral: true });
-                } else {
-                    queue.node.pause();
-                    await interaction.reply({ content: '⏸️ গান পজ করা হয়েছে!', ephemeral: true });
-                }
-            } else if (interaction.customId === 'btn_skip') {
-                queue.node.skip();
-                await interaction.reply({ content: '⏭️ গানটি স্কিপ করা হয়েছে!', ephemeral: true });
-            } else if (interaction.customId === 'btn_stop') {
-                queue.delete();
-                await interaction.reply({ content: '⏹️ মিউজিক বন্ধ করা হয়েছে এবং বট চ্যানেল ছেড়ে চলে গেছে!', ephemeral: true });
-            } else if (interaction.customId === 'btn_autoplay') {
-                const current = autoplayMap.get(interaction.guild.id) || false;
-                const nextState = !current;
-                autoplayMap.set(interaction.guild.id, nextState);
-                queue.repeatMode = nextState ? 3 : 0;
-
-                await interaction.update({ components: getControlButtons(interaction.guild.id) });
-            }
-        } catch (e) {
-            console.error('Button error:', e);
-        }
+client.on("raw", (d) => {
+    const { GatewayDispatchEvents } = require("discord.js");
+    if (![GatewayDispatchEvents.VoiceStateUpdate, GatewayDispatchEvents.VoiceServerUpdate].includes(d.t)) return;
+    if (client.riffy) {
+        client.riffy.updateVoiceState(d);
     }
 });
 
-client.login(process.env.DISCORD_TOKEN);
+client.login(config.TOKEN || process.env.TOKEN).catch((e) => {
+  const lang = getLangSync();
+  console.log('\n' + '─'.repeat(40));
+  console.log(`${colors.magenta}${colors.bright}${lang.console?.bot?.tokenVerification || '🔐 TOKEN VERIFICATION'}${colors.reset}`);
+  console.log('─'.repeat(40));
+  console.log(`${colors.cyan}[ TOKEN ]${colors.reset} ${colors.red}${lang.console?.bot?.tokenAuthFailed || 'Authentication Failed ❌'}${colors.reset}`);
+  console.log(`${colors.gray}${lang.console?.bot?.tokenError || 'Error: Turn On Intents or Reset New Token'}${colors.reset}`);
+});
+
+connectToDatabase().then(() => {
+  const lang = getLangSync();
+  console.log(`${colors.cyan}[ DATABASE ]${colors.reset} ${colors.green}${lang.console?.bot?.databaseOnline || 'MongoDB Online ✅'}${colors.reset}`);
+}).catch((err) => {
+  const lang = getLangSync();
+  console.log('\n' + '─'.repeat(40));
+  console.log(`${colors.magenta}${colors.bright}${lang.console?.bot?.databaseStatus || '🕸️  DATABASE STATUS'}${colors.reset}`);
+  console.log('─'.repeat(40));
+  console.log(`${colors.cyan}[ DATABASE ]${colors.reset} ${colors.red}${lang.console?.bot?.databaseFailed || 'Connection Failed ❌'}${colors.reset}`);
+  console.log(`${colors.gray}${lang.console?.bot?.databaseError?.replace('{message}', err.message) || `Error: ${err.message}`}${colors.reset}`);
+});
+
+// Render Dynamic Port Express Setup
+const express = require("express");
+const app = express();
+const port = process.env.PORT || 3000;
+
+app.get('/', (req, res) => {
+    const imagePath = path.join(__dirname, 'index.html');
+    if (fs.existsSync(imagePath)) {
+        res.sendFile(imagePath);
+    } else {
+        res.send('DARK X MUSIC Bot is Live 24/7!');
+    }
+});
+
+app.listen(port, () => {
+    console.log('\n' + '─'.repeat(40));
+    console.log(`${colors.magenta}${colors.bright}🌐 SERVER STATUS${colors.reset}`);
+    console.log('─'.repeat(40));
+    console.log(`${colors.cyan}[ SERVER ]${colors.reset} ${colors.green}Online ✅${colors.reset}`);
+    console.log(`${colors.cyan}[ PORT ]${colors.reset} ${colors.yellow}Port: ${port}${colors.reset}`);
+    console.log(`${colors.cyan}[ TIME ]${colors.reset} ${colors.gray}${new Date().toISOString().replace('T', ' ').split('.')[0]}${colors.reset}`);
+    console.log(`${colors.cyan}[ USER ]${colors.reset} ${colors.yellow}DARK X CHEATS${colors.reset}`);
+});
