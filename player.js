@@ -1,6 +1,5 @@
 const { Riffy, Player } = require("riffy");
 const { ContainerBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder, PermissionsBitField, MessageFlags, MediaGalleryBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder } = require("discord.js");
-const { requesters } = require("./commands/music/play");
 const { EnhancedMusicCard } = require("./utils/musicCard");
 const config = require("./config.js");
 const { getEmoji, getButtonEmoji } = require('./UI/emojis/emoji');
