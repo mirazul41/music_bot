@@ -28,9 +28,9 @@ const player = new Player(client, {
     }
 });
 
-// Load Extractors
+// Load Extractors (Fixed for v6.6.1)
 (async () => {
-    await player.extractors.loadMulti(DefaultExtractors);
+    await player.extractors.loadDefault();
 })();
 
 // Player Error Handlers
