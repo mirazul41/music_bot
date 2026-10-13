@@ -158,11 +158,10 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             try {
-                // Fixed with searchEngine QueryType.YOUTUBE
-                const searchResult = await player.search(query, {
-                    requestedBy: interaction.user,
-                    searchEngine: QueryType.YOUTUBE
-                });
+               // মোডাল সাবমিটের ভেতরে এই অংশটি এভাবে আপডেট করুন:
+const searchResult = await player.search(query, {
+    requestedBy: interaction.user
+});
 
                 if (!searchResult || !searchResult.tracks.length) {
                     return interaction.editReply({ content: `❌ Kono gan paowa jayni: **${query}**` });
