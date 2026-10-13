@@ -1,16 +1,14 @@
 const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
-const { Player } = require('discord-player');
+const { Player, QueryType } = require('discord-player');
 const { DefaultExtractors } = require('@discord-player/extractor');
 const express = require('express');
 require('dotenv').config();
 
-// 1. Render Port Server Setup
 const app = express();
 const PORT = process.env.PORT || 3000;
 app.get('/', (req, res) => res.send('DARK X MUSIC Bot is Live 24/7!'));
 app.listen(PORT, () => console.log(`Web server listening on port ${PORT}`));
 
-// 2. Initialize Discord Client
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -20,7 +18,6 @@ const client = new Client({
     ]
 });
 
-// 3. Initialize Discord Player with stable ytdl options
 const player = new Player(client, {
     ytdlOptions: {
         filter: 'audioonly',
@@ -29,12 +26,10 @@ const player = new Player(client, {
     }
 });
 
-// Load Default Extractors
 (async () => {
     await player.extractors.loadDefault();
 })();
 
-// Player Error Handlers
 player.events.on('error', (queue, error) => {
     console.log(`[Queue Error] ${error.message}`);
 });
@@ -43,7 +38,6 @@ player.events.on('playerError', (queue, error) => {
     console.log(`[Player Error] ${error.message}`);
 });
 
-// Track Start Notification
 player.events.on('playerStart', (queue, track) => {
     const embed = new EmbedBuilder()
         .setColor('#0099ff')
@@ -159,9 +153,10 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             try {
-                // Direct clean search without complex wrappers
+                // Using SoundCloud Search Engine to bypass Render-YouTube IP block completely
                 const searchResult = await player.search(query, {
-                    requestedBy: interaction.user
+                    requestedBy: interaction.user,
+                    searchEngine: QueryType.SOUNDCLOUD_SEARCH
                 });
 
                 if (!searchResult || !searchResult.tracks.length) {
