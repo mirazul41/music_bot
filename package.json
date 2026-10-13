@@ -1,29 +1,16 @@
 {
-  "name": "music-bot",
+  "name": "music_bot",
   "version": "1.0.0",
-  "description": "Dark X Music Bot",
+  "description": "Discord Music Bot with Express Web Server",
   "main": "bot.js",
   "scripts": {
-    "start": "node bot.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node bot.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
-    "@discord-player/extractor": "^7.2.0",
-    "@discordjs/voice": "^0.19.2",
-    "@snazzah/davey": "^0.1.12",
-    "discord-player": "^7.2.0",
-    "discord.js": "^14.27.0",
-    "dotenv": "^18.0.7",
-    "ffmpeg-static": "^5.3.0",
-    "sodium-native": "^5.1.0",
-    "youtube-ext": "^1.1.25"
-  },
-  "allowScripts": {
-    "esbuild@0.27.7": true,
-    "ffmpeg-static@5.3.0": true
+    "@discord-player/extractor": "^0.5.0",
+    "discord-player": "^6.6.10",
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
   }
 }
