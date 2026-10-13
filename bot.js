@@ -179,7 +179,6 @@ connectToDatabase().then(() => {
   console.log(`${colors.gray}${lang.console?.bot?.databaseError?.replace('{message}', err.message) || `Error: ${err.message}`}${colors.reset}`);
 });
 
-// Render Dynamic Port Express Setup
 const express = require("express");
 const app = express();
 const port = process.env.PORT || 3000;
