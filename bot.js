@@ -14,7 +14,6 @@ const {
     SlashCommandBuilder
 } = require('discord.js');
 const { Player } = require('discord-player');
-const { DefaultExtractors } = require('@discord-player/extractor');
 
 // Discord Client Setup
 const client = new Client({
@@ -29,10 +28,10 @@ const client = new Client({
 // Music Player Setup
 const player = new Player(client);
 
-// Extractor Load & Register Slash Command
+// Extractor Load & Register Slash Command (Fixed loadDefault)
 client.once('clientReady', async () => {
     try {
-        await player.extractors.loadMulti(DefaultExtractors);
+        await player.extractors.loadDefault();
         console.log(`✅ Bot successfully logged in as: ${client.user.tag}`);
 
         // Slash command /join register kora
@@ -96,14 +95,14 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.isChatInputCommand() && interaction.commandName === 'join') {
         const voiceChannel = interaction.member?.voice?.channel;
         if (!voiceChannel) {
-            return interaction.reply({ content: '❌ আপনাকে প্রথমে একটি Voice Channel-এ জয়েন করতে হবে!', ephemeral: true });
+            return interaction.reply({ content: '❌ আপনাকে প্রথমে একটি Voice Channel-এ জয়েন করতে হবে!', ephemeral: true });
         }
 
         const embed = new EmbedBuilder()
             .setColor('#00ffcc')
             .setTitle(`🎶 ${client.user.username.toUpperCase()} - MUSIC PANEL`)
-            .setDescription(`বট ভয়েস চ্যানেল **${voiceChannel.name}**-এ জয়েন করেছে!\nগান বাজাতে নিচের **🔎 Search & Play Song** বাটনে ক্লিক করুন।`)
-            .setFooter({ text: 'এই প্যানেল থেকেই সমস্ত গান নিয়ন্ত্রণ করতে পারবেন।' });
+            .setDescription(`বট ভয়েস চ্যানেল **${voiceChannel.name}**-এ জয়েন করেছে!\nগান বাজাতে নিচের **🔎 Search & Play Song** বাটনে ক্লিক করুন।`)
+            .setFooter({ text: 'এই প্যানেল থেকেই সমস্ত গান নিয়ন্ত্রণ করতে পারবেন।' });
 
         return interaction.reply({
             embeds: [embed],
@@ -136,7 +135,7 @@ client.on('interactionCreate', async (interaction) => {
         const voiceChannel = interaction.member?.voice?.channel;
 
         if (!voiceChannel) {
-            return interaction.reply({ content: '❌ আপনাকে ভয়েস চ্যানেলে থাকতে হবে!', ephemeral: true });
+            return interaction.reply({ content: '❌ আপনাকে ভয়েস চ্যানেলে থাকতে হবে!', ephemeral: true });
         }
 
         await interaction.deferReply();
@@ -173,7 +172,7 @@ client.on('interactionCreate', async (interaction) => {
 
         } catch (error) {
             console.error('Play error:', error);
-            return interaction.editReply({ content: '❌ গানটি চালানো সম্ভব হয়নি!' });
+            return interaction.editReply({ content: '❌ গানটি চালানো সম্ভব হয়নি!' });
         }
     }
 
@@ -189,17 +188,17 @@ client.on('interactionCreate', async (interaction) => {
             if (interaction.customId === 'btn_pause_resume') {
                 if (queue.node.isPaused()) {
                     queue.node.resume();
-                    await interaction.reply({ content: '▶️ গান আবার প্লে করা হয়েছে!', ephemeral: true });
+                    await interaction.reply({ content: '▶️ গান আবার প্লে করা হয়েছে!', ephemeral: true });
                 } else {
                     queue.node.pause();
-                    await interaction.reply({ content: '⏸️ গান পজ করা হয়েছে!', ephemeral: true });
+                    await interaction.reply({ content: '⏸️ গান পজ করা হয়েছে!', ephemeral: true });
                 }
             } else if (interaction.customId === 'btn_skip') {
                 queue.node.skip();
-                await interaction.reply({ content: '⏭️ গানটি স্কিপ করা হয়েছে!', ephemeral: true });
+                await interaction.reply({ content: '⏭️ গানটি স্কিপ করা হয়েছে!', ephemeral: true });
             } else if (interaction.customId === 'btn_stop') {
                 queue.delete();
-                await interaction.reply({ content: '⏹️ মিউজিক বন্ধ করা হয়েছে এবং বট চ্যানেল ছেড়ে চলে গেছে!', ephemeral: true });
+                await interaction.reply({ content: '⏹️ মিউজিক বন্ধ করা হয়েছে এবং বট চ্যানেল ছেড়ে চলে গেছে!', ephemeral: true });
             } else if (interaction.customId === 'btn_autoplay') {
                 const current = autoplayMap.get(interaction.guild.id) || false;
                 const nextState = !current;
