@@ -9,11 +9,13 @@ module.exports = {
                 .setDescription('The song name or URL to play')
                 .setRequired(true)),
     async run(client, interaction) {
-        await interaction.deferReply({ ephemeral: false });
+        if (!interaction.deferred && !interaction.replied) {
+            await interaction.deferReply({ ephemeral: false }).catch(() => {});
+        }
 
         const channel = interaction.member.voice.channel;
         if (!channel) {
-            return interaction.editReply({ content: '❌ You need to join a voice channel first!' });
+            return interaction.editReply({ content: '❌ You need to join a voice channel first!' }).catch(() => {});
         }
 
         const query = interaction.options.getString('query');
@@ -33,37 +35,28 @@ module.exports = {
             const resolve = await client.riffy.resolve({ query: query, requester: interaction.user });
             const { loadType, tracks, playlistInfo } = resolve;
 
-            if (loadType === 'loadFailed') {
-                if (!player.queue.size) player.destroy();
-                return interaction.editReply({ content: '❌ Error getting the song.' });
+            if (loadType === 'loadFailed' || loadType === 'empty' || !tracks || tracks.length === 0) {
+                if (player && !player.queue.size) player.destroy();
+                return interaction.editReply({ content: '❌ No results found or error loading song.' }).catch(() => {});
             }
 
-            if (loadType === 'empty') {
-                if (!player.queue.size) player.destroy();
-                return interaction.editReply({ content: '❌ No results found.' });
-            }
-
-            if (loadType === 'track') {
+            if (loadType === 'track' || loadType === 'search') {
                 player.queue.add(tracks[0]);
                 if (!player.playing && !player.paused) player.play();
-                return interaction.editReply({ content: `🎶 Added **[${tracks[0].info.title}](${tracks[0].info.uri})** to the queue!` });
-            } else if (loadType === 'search') {
-                player.queue.add(tracks[0]);
-                if (!player.playing && !player.paused) player.play();
-                return interaction.editReply({ content: `🎶 Added **[${tracks[0].info.title}](${tracks[0].info.uri})** to the queue!` });
+                return interaction.editReply({ content: `🎶 Added **[${tracks[0].info.title}](${tracks[0].info.uri})** to the queue!` }).catch(() => {});
             } else if (loadType === 'playlist') {
                 for (const track of tracks) {
                     player.queue.add(track);
                 }
                 if (!player.playing && !player.paused) player.play();
-                return interaction.editReply({ content: `🎶 Added playlist **${playlistInfo.name}** (${tracks.length} tracks) to the queue!` });
+                return interaction.editReply({ content: `🎶 Added playlist **${playlistInfo.name}** (${tracks.length} tracks) to the queue!` }).catch(() => {});
             } else {
-                return interaction.editReply({ content: '❌ No results found.' });
+                return interaction.editReply({ content: '❌ No results found.' }).catch(() => {});
             }
 
         } catch (error) {
-            console.error(error);
-            return interaction.editReply({ content: '❌ An error occurred while processing your request.' });
+            console.error('Play command error:', error);
+            return interaction.editReply({ content: '❌ An error occurred while processing your request.' }).catch(() => {});
         }
     }
 };
