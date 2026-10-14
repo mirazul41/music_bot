@@ -1,7 +1,8 @@
 module.exports = {
-  TOKEN: "1069853105405046904",
-  language: "en",
-  ownerID: ["962994407651553302", ""], 
+    TOKEN: process.env.TOKEN || "",
+    language: "en",
+    ownerID: ["967994487651553307", ""],
+    // বাকি সব যেমন আছে তেমনই থাকবে...
   mongodbUri : "mongodb+srv://shiva:shiva@musicbotyt.ouljywv.mongodb.net/?retryWrites=true&w=majority",
   spotifyClientId : "d92baed9605a45a39ed7c2a2d960b1c1",
   spotifyClientSecret : "e9b29f6739de4315bc03b6d8a8e93b03",
