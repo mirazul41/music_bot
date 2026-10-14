@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits } = require("discord.js");
+const { Client, GatewayIntentBits, Collection } = require("discord.js");
 const config = require("./config.js");
 const fs = require("fs");
 const path = require('path');
@@ -12,6 +12,8 @@ const client = new Client({
 });
 
 client.config = config;
+client.commands = new Collection();
+client.commandsArray = [];
 
 process.on('unhandledRejection', (error) => {
     console.warn('[ ERROR ] Unhandled Rejection:', error?.message || error);
@@ -25,7 +27,7 @@ initializePlayer(client).catch(error => {
     console.error(`[ LAVALINK ] Error initializing player: ${error.message}`);
 });
 
-client.on("clientReady", () => {
+client.on("clientReady", async () => {
     console.log(`[ SYSTEM ] Client logged in as ${client.user.tag}`);
     console.log(`[ MUSIC ] Riffy Music System Ready 🎵`);
    
@@ -37,11 +39,23 @@ client.on("clientReady", () => {
             console.error(`[ LAVALINK ] Failed to initialize Riffy:`, e.message);
         }
     }
+
+    // Register Slash Commands globally or to guild
+    try {
+        const { REST, Routes } = require('discord.js');
+        const rest = new REST({ version: '10' }).setToken(config.TOKEN || process.env.TOKEN);
+        
+        await rest.put(
+            Routes.applicationCommands(client.user.id),
+            { body: client.commandsArray },
+        );
+        console.log(`[ COMMANDS ] Successfully reloaded application slash commands.`);
+    } catch (error) {
+        console.error(`[ COMMANDS ] Failed to reload slash commands: ${error.message}`);
+    }
 });
 
-client.commands = new Map();
-client.commandsArray = [];
-
+// Load Commands from directories
 const loadCommands = () => {
   const commandsDir = path.resolve(__dirname, config.commandsDir || './commands');
   if (!fs.existsSync(commandsDir)) return;
@@ -72,6 +86,25 @@ const loadCommands = () => {
 
 loadCommands();
 
+// Interaction Create Handler (Fixes "The application did not respond")
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isChatInputCommand()) return;
+
+    const command = client.commands.get(interaction.commandName);
+    if (!command) return;
+
+    try {
+        await command.run(client, interaction);
+    } catch (error) {
+        console.error(`Error executing ${interaction.commandName}:`, error);
+        if (interaction.replied || interaction.deferred) {
+            await interaction.followUp({ content: 'There was an error while executing this command!', ephemeral: true }).catch(() => {});
+        } else {
+            await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true }).catch(() => {});
+        }
+    }
+});
+
 client.on("raw", (d) => {
     const { GatewayDispatchEvents } = require("discord.js");
     if (![GatewayDispatchEvents.VoiceStateUpdate, GatewayDispatchEvents.VoiceServerUpdate].includes(d.t)) return;
@@ -84,14 +117,12 @@ client.login(config.TOKEN || process.env.TOKEN).catch((e) => {
   console.error(`[ TOKEN ] Authentication Failed ❌ Error: ${e.message}`);
 });
 
-// Database Dummy Connection to avoid missing module errors
 const connectToDatabase = async () => {
     console.log('[ DATABASE ] MongoDB Bypass Active ✅');
 };
 
 connectToDatabase().catch(() => {});
 
-// Render Dynamic Port Express Server Setup
 const express = require("express");
 const app = express();
 const port = process.env.PORT || 3000;
