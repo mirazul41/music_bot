@@ -40,16 +40,21 @@ client.on("clientReady", async () => {
         }
     }
 
-    // Register Slash Commands globally or to guild
+    // Register Slash Commands safely using client.token
     try {
         const { REST, Routes } = require('discord.js');
-        const rest = new REST({ version: '10' }).setToken(config.TOKEN || process.env.TOKEN);
+        const token = client.token || config.TOKEN || process.env.TOKEN;
         
-        await rest.put(
-            Routes.applicationCommands(client.user.id),
-            { body: client.commandsArray },
-        );
-        console.log(`[ COMMANDS ] Successfully reloaded application slash commands.`);
+        if (token && client.commandsArray.length > 0) {
+            const rest = new REST({ version: '10' }).setToken(token);
+            await rest.put(
+                Routes.applicationCommands(client.user.id),
+                { body: client.commandsArray },
+            );
+            console.log(`[ COMMANDS ] Successfully reloaded ${client.commandsArray.length} application slash commands.`);
+        } else {
+            console.warn(`[ COMMANDS ] Skipping slash command reload: Token missing or no commands loaded.`);
+        }
     } catch (error) {
         console.error(`[ COMMANDS ] Failed to reload slash commands: ${error.message}`);
     }
