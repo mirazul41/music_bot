@@ -28,7 +28,7 @@ initializePlayer(client).catch(error => {
 });
 
 client.on("clientReady", async () => {
-    console.log(`[ SYSTEM ] Client logged in as client: ${client.user.tag}`);
+    console.log(`[ SYSTEM ] Client logged in as ${client.user.tag}`);
     console.log(`[ MUSIC ] Riffy Music System Ready 🎵`);
    
     if (client.riffy) {
@@ -40,43 +40,26 @@ client.on("clientReady", async () => {
         }
     }
 
-    // Direct Slash Commands Registration
-    try {
-        const { REST, Routes } = require('discord.js');
-        const botToken = process.env.TOKEN || config.TOKEN;
-        
-        if (botToken && client.commandsArray.length > 0) {
-            const rest = new REST({ version: '10' }).setToken(botToken);
-            await rest.put(
-                Routes.applicationCommands(client.user.id),
-                { body: client.commandsArray },
-            );
-            console.log(`[ COMMANDS ] Successfully reloaded ${client.commandsArray.length} slash commands globally!`);
-        } else {
-            console.log(`[ COMMANDS ] Commands array is empty or token not found for REST reload.`);
+    // Direct Slash Commands Registration (Wrapped in IIFE to prevent syntax error)
+    (async () => {
+        try {
+            const { REST, Routes } = require('discord.js');
+            const botToken = process.env.TOKEN || config.TOKEN;
+            
+            if (botToken && client.commandsArray.length > 0) {
+                const rest = new REST({ version: '10' }).setToken(botToken);
+                await rest.put(
+                    Routes.applicationCommands(client.user.id),
+                    { body: client.commandsArray },
+                );
+                console.log(`[ COMMANDS ] Successfully reloaded ${client.commandsArray.length} slash commands globally!`);
+            } else {
+                console.log(`[ COMMANDS ] Commands array is empty or token not found for REST reload.`);
+            }
+        } catch (error) {
+            console.error(`[ COMMANDS ] Failed to reload slash commands: ${error.message}`);
         }
-    } catch (error) {
-        console.error(`[ COMMANDS ] Failed to reload slash commands: ${error.message}`);
-    }
-});
-    // Register Slash Commands safely using client.token
-    try {
-        const { REST, Routes } = require('discord.js');
-        const token = client.token || config.TOKEN || process.env.TOKEN;
-        
-        if (token && client.commandsArray.length > 0) {
-            const rest = new REST({ version: '10' }).setToken(token);
-            await rest.put(
-                Routes.applicationCommands(client.user.id),
-                { body: client.commandsArray },
-            );
-            console.log(`[ COMMANDS ] Successfully reloaded ${client.commandsArray.length} application slash commands.`);
-        } else {
-            console.warn(`[ COMMANDS ] Skipping slash command reload: Token missing or no commands loaded.`);
-        }
-    } catch (error) {
-        console.error(`[ COMMANDS ] Failed to reload slash commands: ${error.message}`);
-    }
+    })();
 });
 
 // Load Commands from directories
@@ -137,7 +120,7 @@ client.on("raw", (d) => {
     }
 });
 
-client.login(config.TOKEN || process.env.TOKEN).catch((e) => {
+client.login(process.env.TOKEN || config.TOKEN).catch((e) => {
   console.error(`[ TOKEN ] Authentication Failed ❌ Error: ${e.message}`);
 });
 
