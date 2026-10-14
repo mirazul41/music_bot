@@ -28,7 +28,7 @@ initializePlayer(client).catch(error => {
 });
 
 client.on("clientReady", async () => {
-    console.log(`[ SYSTEM ] Client logged in as ${client.user.tag}`);
+    console.log(`[ SYSTEM ] Client logged in as client: ${client.user.tag}`);
     console.log(`[ MUSIC ] Riffy Music System Ready 🎵`);
    
     if (client.riffy) {
@@ -40,6 +40,25 @@ client.on("clientReady", async () => {
         }
     }
 
+    // Direct Slash Commands Registration
+    try {
+        const { REST, Routes } = require('discord.js');
+        const botToken = process.env.TOKEN || config.TOKEN;
+        
+        if (botToken && client.commandsArray.length > 0) {
+            const rest = new REST({ version: '10' }).setToken(botToken);
+            await rest.put(
+                Routes.applicationCommands(client.user.id),
+                { body: client.commandsArray },
+            );
+            console.log(`[ COMMANDS ] Successfully reloaded ${client.commandsArray.length} slash commands globally!`);
+        } else {
+            console.log(`[ COMMANDS ] Commands array is empty or token not found for REST reload.`);
+        }
+    } catch (error) {
+        console.error(`[ COMMANDS ] Failed to reload slash commands: ${error.message}`);
+    }
+});
     // Register Slash Commands safely using client.token
     try {
         const { REST, Routes } = require('discord.js');
